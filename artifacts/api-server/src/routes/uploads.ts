@@ -25,6 +25,25 @@ const uploadRateLimit = rateLimit({
   },
 });
 
+const ALLOWED_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/bmp",
+  "video/mp4",
+  "video/quicktime",
+  "video/x-msvideo",
+  "video/x-matroska",
+  "video/webm",
+  "video/mpeg",
+  "video/3gpp",
+]);
+
+function isAllowed(mimetype: string): boolean {
+  return ALLOWED_MIME_TYPES.has(mimetype);
+}
+
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -45,10 +64,10 @@ const singleUpload = multer({
   storage,
   limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/")) {
+    if (isAllowed(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Only image and video files are allowed"));
+      cb(new Error("Недопустимый формат файла. Разрешены: JPG, PNG, GIF, WEBP, BMP, MP4, MOV, AVI, MKV, WEBM."));
     }
   },
 });
@@ -57,10 +76,10 @@ const batchUpload = multer({
   storage,
   limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/")) {
+    if (isAllowed(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Only image and video files are allowed"));
+      cb(new Error("Недопустимый формат файла. Разрешены: JPG, PNG, GIF, WEBP, BMP, MP4, MOV, AVI, MKV, WEBM."));
     }
   },
 });

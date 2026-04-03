@@ -14,6 +14,24 @@ const MAX_FILE_SIZE = 100 * 1024 * 1024;
 const MAX_IMAGES = 5;
 const MAX_VIDEOS = 3;
 
+const ALLOWED_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/bmp",
+  "video/mp4",
+  "video/quicktime",
+  "video/x-msvideo",
+  "video/x-matroska",
+  "video/webm",
+  "video/mpeg",
+  "video/3gpp",
+]);
+
+const ACCEPT = ".jpg,.jpeg,.png,.gif,.webp,.bmp,.mp4,.mov,.avi,.mkv,.webm,.mpeg,.3gp";
+const FORMAT_LABEL = "JPG, PNG, GIF, WEBP, BMP, MP4, MOV, AVI, MKV, WEBM";
+
 function formatSize(bytes: number) {
   const mb = bytes / (1024 * 1024);
   return `${mb.toFixed(2)} MB`;
@@ -66,8 +84,8 @@ export default function Home() {
     let curVideos = videoCount;
 
     for (const file of newFiles) {
-      if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
-        newErrors.push(`${file.name}: только фото и видео`);
+      if (!ALLOWED_MIME_TYPES.has(file.type)) {
+        newErrors.push(`${file.name}: недопустимый формат. Разрешены: ${FORMAT_LABEL}`);
         continue;
       }
       if (file.size > MAX_FILE_SIZE) {
@@ -246,7 +264,7 @@ export default function Home() {
                   ref={fileInputRef}
                   type="file"
                   className="hidden"
-                  accept="image/*,video/*"
+                  accept={ACCEPT}
                   multiple
                   onChange={handleChange}
                   disabled={batchMutation.isPending}
@@ -269,7 +287,10 @@ export default function Home() {
                       Видео {videoCount}/{MAX_VIDEOS}
                     </span>
                     <span className="px-3 py-1 bg-secondary border border-border rounded-full text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Макс. 100 MB / файл
+                      Макс. 100 MB
+                    </span>
+                    <span className="px-3 py-1 bg-secondary border border-border rounded-full text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      JPG PNG GIF MP4 MOV AVI MKV
                     </span>
                   </div>
                 </div>
