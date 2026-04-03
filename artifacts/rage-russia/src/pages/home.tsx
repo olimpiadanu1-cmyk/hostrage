@@ -159,10 +159,15 @@ export default function Home() {
             setUploadProgress(0);
           }, 600);
         },
-        onError: () => {
+        onError: (err: unknown) => {
           clearInterval(interval);
           setUploadProgress(0);
-          toast({ title: "Ошибка загрузки", description: "Не удалось загрузить файлы. Попробуйте снова.", variant: "destructive" });
+          const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+          if (msg?.includes("Слишком много")) {
+            toast({ title: "Лимит загрузок", description: msg, variant: "destructive" });
+          } else {
+            toast({ title: "Ошибка загрузки", description: "Не удалось загрузить файлы. Попробуйте снова.", variant: "destructive" });
+          }
         },
       }
     );

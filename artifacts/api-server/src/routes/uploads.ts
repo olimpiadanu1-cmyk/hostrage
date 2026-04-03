@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import multer from "multer";
+import rateLimit from "express-rate-limit";
 import path from "path";
 import fs from "fs";
 import { randomBytes } from "crypto";
@@ -8,6 +9,21 @@ import { eq, lt } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
+
+const uploadRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const forwarded = req.headers["x-forwarded-for"];
+    const ip = Array.isArray(forwarded) ? forwarded[0] : (forwarded ?? req.socket.remoteAddress ?? "unknown");
+    return ip.split(",")[0].trim();
+  },
+  handler: (_req, res) => {
+    res.status(429).json({ error: "Слишком много загрузок. Попробуйте снова через час." });
+  },
+});
 
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 
@@ -79,7 +95,7 @@ async function saveUpload(file: Express.Multer.File, base: string) {
   };
 }
 
-router.post("/uploads", (req, res, next) => {
+router.post("/uploads", uploadRateLimit, (req, res, next) => {
   singleUpload.single("file")(req, res, async (err) => {
     if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
       res.status(400).json({ error: "File too large. Maximum size is 100MB." });
@@ -105,7 +121,7 @@ router.post("/uploads", (req, res, next) => {
   });
 });
 
-router.post("/uploads/batch", (req, res, next) => {
+router.post("/uploads/batch", uploadRateLimit, (req, res, next) => {
   batchUpload.array("files", 8)(req, res, async (err) => {
     if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
       res.status(400).json({ error: "File too large. Maximum size per file is 100MB." });
