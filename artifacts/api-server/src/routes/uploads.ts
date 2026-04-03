@@ -40,25 +40,12 @@ const singleUpload = multer({
 const batchUpload = multer({
   storage,
   limits: { fileSize: 100 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith("image/") && !file.mimetype.startsWith("video/")) {
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/")) {
+      cb(null, true);
+    } else {
       cb(new Error("Only image and video files are allowed"));
-      return;
     }
-    const files = (req as unknown as { files?: Express.Multer.File[] }).files;
-    const existing = Array.isArray(files) ? files : [];
-    const imageCount = existing.filter((f) => f.mimetype.startsWith("image/")).length;
-    const videoCount = existing.filter((f) => f.mimetype.startsWith("video/")).length;
-
-    if (file.mimetype.startsWith("image/") && imageCount >= 5) {
-      cb(new Error("Maximum 5 images allowed"));
-      return;
-    }
-    if (file.mimetype.startsWith("video/") && videoCount >= 3) {
-      cb(new Error("Maximum 3 videos allowed"));
-      return;
-    }
-    cb(null, true);
   },
 });
 
