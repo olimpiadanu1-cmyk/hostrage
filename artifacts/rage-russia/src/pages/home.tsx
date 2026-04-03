@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { useUploadFile } from "@workspace/api-client-react";
 import {
   Upload, X, AlertTriangle, CheckCircle2, Copy, FileVideo,
-  FileImage, ArrowLeft, Clock, ShieldAlert, ChevronRight
+  FileImage, ArrowLeft, Clock, ShieldAlert, ChevronRight, Play
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -20,10 +20,13 @@ type AppState = "upload" | "too_large" | "success";
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [appState, setAppState] = useState<AppState>("upload");
   const [uploadResult, setUploadResult] = useState<{ url: string; expiresAt: string } | null>(null);
+  const [successPreviewUrl, setSuccessPreviewUrl] = useState<string | null>(null);
+  const [successFileType, setSuccessFileType] = useState<"image" | "video" | null>(null);
   const [copied, setCopied] = useState(false);
 
   const { toast } = useToast();
@@ -45,9 +48,13 @@ export default function Home() {
     if (selectedFile.size > MAX_FILE_SIZE) {
       setAppState("too_large");
       setFile(null);
+      if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(null); }
       return;
     }
     setAppState("upload");
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    const url = URL.createObjectURL(selectedFile);
+    setPreviewUrl(url);
     setFile(selectedFile);
   };
 
@@ -74,14 +81,22 @@ export default function Home() {
       });
     }, 250);
 
+    const savedPreview = previewUrl;
+    const savedFile = file;
+
     uploadMutation.mutate({ data: { file } }, {
       onSuccess: (data) => {
         clearInterval(interval);
         setUploadProgress(100);
         setTimeout(() => {
           setUploadResult({ url: data.url, expiresAt: data.expiresAt });
+          if (savedPreview && savedFile) {
+            setSuccessPreviewUrl(savedPreview);
+            setSuccessFileType(savedFile.type.startsWith("video/") ? "video" : "image");
+          }
           setAppState("success");
           setFile(null);
+          setPreviewUrl(null);
           setUploadProgress(0);
         }, 600);
       },
@@ -94,7 +109,12 @@ export default function Home() {
   };
 
   const resetToUpload = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    if (successPreviewUrl) URL.revokeObjectURL(successPreviewUrl);
     setFile(null);
+    setPreviewUrl(null);
+    setSuccessPreviewUrl(null);
+    setSuccessFileType(null);
     setAppState("upload");
     setUploadResult(null);
     setUploadProgress(0);
@@ -193,6 +213,36 @@ export default function Home() {
                       className="w-full"
                       onClick={(e) => e.stopPropagation()}
                     >
+                      {/* Image/video preview */}
+                      {previewUrl && (
+                        <div className="relative mb-3 rounded-lg overflow-hidden border border-border bg-black" style={{ maxHeight: 220 }}>
+                          {file.type.startsWith("video/") ? (
+                            <video
+                              src={previewUrl}
+                              className="w-full object-contain"
+                              style={{ maxHeight: 220 }}
+                              muted
+                              playsInline
+                            />
+                          ) : (
+                            <img
+                              src={previewUrl}
+                              alt="Предпросмотр"
+                              className="w-full object-contain"
+                              style={{ maxHeight: 220 }}
+                            />
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
+                          {file.type.startsWith("video/") && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="p-3 bg-black/50 rounded-full border border-white/20">
+                                <Play className="w-6 h-6 text-white fill-white" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* File card */}
                       <div className="bg-secondary/80 border border-border rounded-lg p-4 mb-4 flex items-center gap-3">
                         <div className="flex-shrink-0 p-2.5 bg-primary/15 border border-primary/30 rounded-lg">
@@ -305,16 +355,50 @@ export default function Home() {
 
               {/* Success card */}
               <div className="bg-card border border-border rounded-xl overflow-hidden glow-red-sm">
-                {/* Header */}
-                <div className="relative bg-primary/10 border-b border-primary/20 px-6 py-8 flex flex-col items-center text-center overflow-hidden">
-                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,hsl(348_90%_52%/0.12),transparent_70%)]" />
-                  <div className="relative z-10">
-                    <div className="inline-flex p-4 bg-primary/15 border border-primary/30 rounded-full mb-4">
-                      <CheckCircle2 className="w-10 h-10 text-primary" />
+                {/* Header with preview */}
+                <div className="relative border-b border-primary/20 overflow-hidden">
+                  {/* Preview behind header */}
+                  {successPreviewUrl ? (
+                    <div className="relative">
+                      <div className="w-full bg-black" style={{ maxHeight: 260 }}>
+                        {successFileType === "video" ? (
+                          <video
+                            src={successPreviewUrl}
+                            className="w-full object-contain"
+                            style={{ maxHeight: 260 }}
+                            muted
+                            playsInline
+                          />
+                        ) : (
+                          <img
+                            src={successPreviewUrl}
+                            alt="Загруженный файл"
+                            className="w-full object-contain"
+                            style={{ maxHeight: 260 }}
+                          />
+                        )}
+                      </div>
+                      <div className="absolute inset-0 bg-gradient-to-t from-card via-card/60 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 px-6 pb-6 flex flex-col items-center text-center">
+                        <div className="inline-flex p-3 bg-primary/20 border border-primary/40 rounded-full mb-3 backdrop-blur-sm">
+                          <CheckCircle2 className="w-8 h-8 text-primary" />
+                        </div>
+                        <h2 className="text-2xl font-black uppercase tracking-tight">Файл загружен!</h2>
+                        <p className="text-muted-foreground text-sm mt-1">Доказательство успешно сохранено</p>
+                      </div>
                     </div>
-                    <h2 className="text-2xl font-black uppercase tracking-tight">Файл загружен!</h2>
-                    <p className="text-muted-foreground text-sm mt-1">Доказательство успешно сохранено</p>
-                  </div>
+                  ) : (
+                    <div className="relative bg-primary/10 px-6 py-8 flex flex-col items-center text-center">
+                      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,hsl(348_90%_52%/0.12),transparent_70%)]" />
+                      <div className="relative z-10">
+                        <div className="inline-flex p-4 bg-primary/15 border border-primary/30 rounded-full mb-4">
+                          <CheckCircle2 className="w-10 h-10 text-primary" />
+                        </div>
+                        <h2 className="text-2xl font-black uppercase tracking-tight">Файл загружен!</h2>
+                        <p className="text-muted-foreground text-sm mt-1">Доказательство успешно сохранено</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-6 space-y-6">
