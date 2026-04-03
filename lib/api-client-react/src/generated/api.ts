@@ -17,6 +17,8 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  BatchUploadFilesBody,
+  BatchUploadResponse,
   ErrorResponse,
   HealthStatus,
   UploadFileBody,
@@ -110,8 +112,7 @@ export function useHealthCheck<
 }
 
 /**
- * Upload a photo or video file (max 100MB). Returns a unique link.
- * @summary Upload a file
+ * @summary Upload a single file
  */
 export const getUploadFileUrl = () => {
   return `/api/uploads`;
@@ -176,7 +177,7 @@ export type UploadFileMutationBody = BodyType<UploadFileBody>;
 export type UploadFileMutationError = ErrorType<ErrorResponse>;
 
 /**
- * @summary Upload a file
+ * @summary Upload a single file
  */
 export const useUploadFile = <
   TError = ErrorType<ErrorResponse>,
@@ -199,7 +200,96 @@ export const useUploadFile = <
 };
 
 /**
- * Get info about an uploaded file by its token
+ * @summary Upload multiple files (up to 5 images + 3 videos)
+ */
+export const getBatchUploadFilesUrl = () => {
+  return `/api/uploads/batch`;
+};
+
+export const batchUploadFiles = async (
+  batchUploadFilesBody: BatchUploadFilesBody,
+  options?: RequestInit,
+): Promise<BatchUploadResponse> => {
+  const formData = new FormData();
+  batchUploadFilesBody.files.forEach((value) =>
+    formData.append(`files`, value),
+  );
+
+  return customFetch<BatchUploadResponse>(getBatchUploadFilesUrl(), {
+    ...options,
+    method: "POST",
+    body: formData,
+  });
+};
+
+export const getBatchUploadFilesMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof batchUploadFiles>>,
+    TError,
+    { data: BodyType<BatchUploadFilesBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof batchUploadFiles>>,
+  TError,
+  { data: BodyType<BatchUploadFilesBody> },
+  TContext
+> => {
+  const mutationKey = ["batchUploadFiles"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof batchUploadFiles>>,
+    { data: BodyType<BatchUploadFilesBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return batchUploadFiles(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BatchUploadFilesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof batchUploadFiles>>
+>;
+export type BatchUploadFilesMutationBody = BodyType<BatchUploadFilesBody>;
+export type BatchUploadFilesMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Upload multiple files (up to 5 images + 3 videos)
+ */
+export const useBatchUploadFiles = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof batchUploadFiles>>,
+    TError,
+    { data: BodyType<BatchUploadFilesBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof batchUploadFiles>>,
+  TError,
+  { data: BodyType<BatchUploadFilesBody> },
+  TContext
+> => {
+  return useMutation(getBatchUploadFilesMutationOptions(options));
+};
+
+/**
  * @summary Get upload info
  */
 export const getGetUploadUrl = (token: string) => {
@@ -285,7 +375,6 @@ export function useGetUpload<
 }
 
 /**
- * Streams the uploaded file
  * @summary Serve the uploaded file
  */
 export const getServeUploadUrl = (token: string) => {

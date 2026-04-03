@@ -15,6 +15,10 @@ export interface UploadResponse {
   expiresAt: string;
 }
 
+export interface BatchUploadResponse {
+  uploads: UploadResponse[];
+}
+
 export interface UploadInfo {
   token: string;
   originalName: string;
@@ -30,4 +34,8 @@ export interface ErrorResponse {
 
 export type UploadFileBody = {
   file: Blob;
+};
+
+export type BatchUploadFilesBody = {
+  files: Blob[];
 };

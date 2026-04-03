@@ -30,8 +30,7 @@ paths:
     post:
       operationId: uploadFile
       tags: [uploads]
-      summary: Upload a file
-      description: Upload a photo or video file (max 100MB). Returns a unique link.
+      summary: Upload a single file
       requestBody:
         required: true
         content:
@@ -52,7 +51,39 @@ paths:
               schema:
                 $ref: "#/components/schemas/UploadResponse"
         "400":
-          description: Bad request (file too large or invalid type)
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /uploads/batch:
+    post:
+      operationId: batchUploadFiles
+      tags: [uploads]
+      summary: Upload multiple files (up to 5 images + 3 videos)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+              required:
+                - files
+      responses:
+        "201":
+          description: Files uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchUploadResponse"
+        "400":
+          description: Bad request
           content:
             application/json:
               schema:
@@ -62,7 +93,6 @@ paths:
       operationId: getUpload
       tags: [uploads]
       summary: Get upload info
-      description: Get info about an uploaded file by its token
       parameters:
         - name: token
           in: path
@@ -87,7 +117,6 @@ paths:
       operationId: serveUpload
       tags: [uploads]
       summary: Serve the uploaded file
-      description: Streams the uploaded file
       parameters:
         - name: token
           in: path
@@ -130,6 +159,15 @@ components:
         - token
         - url
         - expiresAt
+    BatchUploadResponse:
+      type: object
+      properties:
+        uploads:
+          type: array
+          items:
+            $ref: "#/components/schemas/UploadResponse"
+      required:
+        - uploads
     UploadInfo:
       type: object
       properties:

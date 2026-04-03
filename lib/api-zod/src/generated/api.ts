@@ -16,15 +16,20 @@ export const HealthCheckResponse = zod.object({
 });
 
 /**
- * Upload a photo or video file (max 100MB). Returns a unique link.
- * @summary Upload a file
+ * @summary Upload a single file
  */
 export const UploadFileBody = zod.object({
   file: zod.instanceof(File),
 });
 
 /**
- * Get info about an uploaded file by its token
+ * @summary Upload multiple files (up to 5 images + 3 videos)
+ */
+export const BatchUploadFilesBody = zod.object({
+  files: zod.array(zod.instanceof(File)),
+});
+
+/**
  * @summary Get upload info
  */
 export const GetUploadParams = zod.object({
@@ -41,7 +46,6 @@ export const GetUploadResponse = zod.object({
 });
 
 /**
- * Streams the uploaded file
  * @summary Serve the uploaded file
  */
 export const ServeUploadParams = zod.object({

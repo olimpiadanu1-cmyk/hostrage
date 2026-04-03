@@ -25,7 +25,7 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({
+const singleUpload = multer({
   storage,
   limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
@@ -34,6 +34,31 @@ const upload = multer({
     } else {
       cb(new Error("Only image and video files are allowed"));
     }
+  },
+});
+
+const batchUpload = multer({
+  storage,
+  limits: { fileSize: 100 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith("image/") && !file.mimetype.startsWith("video/")) {
+      cb(new Error("Only image and video files are allowed"));
+      return;
+    }
+    const files = (req as unknown as { files?: Express.Multer.File[] }).files;
+    const existing = Array.isArray(files) ? files : [];
+    const imageCount = existing.filter((f) => f.mimetype.startsWith("image/")).length;
+    const videoCount = existing.filter((f) => f.mimetype.startsWith("video/")).length;
+
+    if (file.mimetype.startsWith("image/") && imageCount >= 5) {
+      cb(new Error("Maximum 5 images allowed"));
+      return;
+    }
+    if (file.mimetype.startsWith("video/") && videoCount >= 3) {
+      cb(new Error("Maximum 3 videos allowed"));
+      return;
+    }
+    cb(null, true);
   },
 });
 
@@ -47,8 +72,28 @@ function getBaseUrl(req: Parameters<typeof router.get>[1] extends (req: infer R,
   return `${protocol}://${host}`;
 }
 
+async function saveUpload(file: Express.Multer.File, base: string) {
+  const token = generateToken();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  await db.insert(uploadsTable).values({
+    token,
+    originalName: file.originalname,
+    mimeType: file.mimetype,
+    size: file.size,
+    filePath: file.filename,
+    expiresAt,
+  });
+
+  return {
+    token,
+    url: `${base}/api/uploads/${token}/file`,
+    expiresAt: expiresAt.toISOString(),
+  };
+}
+
 router.post("/uploads", (req, res, next) => {
-  upload.single("file")(req, res, async (err) => {
+  singleUpload.single("file")(req, res, async (err) => {
     if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
       res.status(400).json({ error: "File too large. Maximum size is 100MB." });
       return;
@@ -58,35 +103,56 @@ router.post("/uploads", (req, res, next) => {
       res.status(400).json({ error: err.message });
       return;
     }
-
     try {
       if (!req.file) {
         res.status(400).json({ error: "No file provided" });
         return;
       }
+      const base = getBaseUrl(req as never);
+      const result = await saveUpload(req.file, base);
+      req.log.info({ token: result.token, size: req.file.size }, "File uploaded");
+      res.status(201).json(result);
+    } catch (error) {
+      next(error);
+    }
+  });
+});
 
-      const token = generateToken();
-      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+router.post("/uploads/batch", (req, res, next) => {
+  batchUpload.array("files", 8)(req, res, async (err) => {
+    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+      res.status(400).json({ error: "File too large. Maximum size per file is 100MB." });
+      return;
+    }
+    if (err) {
+      req.log.warn({ err: err.message }, "Batch upload error");
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    try {
+      const files = req.files as Express.Multer.File[] | undefined;
+      if (!files || files.length === 0) {
+        res.status(400).json({ error: "No files provided" });
+        return;
+      }
 
-      await db.insert(uploadsTable).values({
-        token,
-        originalName: req.file.originalname,
-        mimeType: req.file.mimetype,
-        size: req.file.size,
-        filePath: req.file.filename,
-        expiresAt,
-      });
+      const images = files.filter((f) => f.mimetype.startsWith("image/"));
+      const videos = files.filter((f) => f.mimetype.startsWith("video/"));
+
+      if (images.length > 5) {
+        res.status(400).json({ error: "Maximum 5 images allowed" });
+        return;
+      }
+      if (videos.length > 3) {
+        res.status(400).json({ error: "Maximum 3 videos allowed" });
+        return;
+      }
 
       const base = getBaseUrl(req as never);
-      const url = `${base}/api/uploads/${token}/file`;
+      const uploads = await Promise.all(files.map((f) => saveUpload(f, base)));
 
-      req.log.info({ token, size: req.file.size }, "File uploaded");
-
-      res.status(201).json({
-        token,
-        url,
-        expiresAt: expiresAt.toISOString(),
-      });
+      req.log.info({ count: files.length }, "Batch uploaded");
+      res.status(201).json({ uploads });
     } catch (error) {
       next(error);
     }
@@ -95,7 +161,6 @@ router.post("/uploads", (req, res, next) => {
 
 router.get("/uploads/:token", async (req, res): Promise<void> => {
   const rawToken = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
-
   const [row] = await db.select().from(uploadsTable).where(eq(uploadsTable.token, rawToken));
 
   if (!row) {
@@ -104,17 +169,14 @@ router.get("/uploads/:token", async (req, res): Promise<void> => {
   }
 
   if (new Date() > row.expiresAt) {
-    const filePath = path.join(UPLOADS_DIR, row.filePath);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    const fp = path.join(UPLOADS_DIR, row.filePath);
+    if (fs.existsSync(fp)) fs.unlinkSync(fp);
     await db.delete(uploadsTable).where(eq(uploadsTable.token, rawToken));
     res.status(404).json({ error: "Upload not found or expired" });
     return;
   }
 
   const base = getBaseUrl(req as never);
-
   res.json({
     token: row.token,
     originalName: row.originalName,
@@ -127,7 +189,6 @@ router.get("/uploads/:token", async (req, res): Promise<void> => {
 
 router.get("/uploads/:token/file", async (req, res): Promise<void> => {
   const rawToken = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
-
   const [row] = await db.select().from(uploadsTable).where(eq(uploadsTable.token, rawToken));
 
   if (!row) {
@@ -136,17 +197,14 @@ router.get("/uploads/:token/file", async (req, res): Promise<void> => {
   }
 
   if (new Date() > row.expiresAt) {
-    const filePath = path.join(UPLOADS_DIR, row.filePath);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    const fp = path.join(UPLOADS_DIR, row.filePath);
+    if (fs.existsSync(fp)) fs.unlinkSync(fp);
     await db.delete(uploadsTable).where(eq(uploadsTable.token, rawToken));
     res.status(404).json({ error: "Upload not found or expired" });
     return;
   }
 
   const filePath = path.join(UPLOADS_DIR, row.filePath);
-
   if (!fs.existsSync(filePath)) {
     res.status(404).json({ error: "File not found" });
     return;
@@ -161,14 +219,10 @@ export async function cleanupExpiredUploads(): Promise<void> {
   try {
     const now = new Date();
     const expired = await db.select().from(uploadsTable).where(lt(uploadsTable.expiresAt, now));
-
     for (const row of expired) {
-      const filePath = path.join(UPLOADS_DIR, row.filePath);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+      const fp = path.join(UPLOADS_DIR, row.filePath);
+      if (fs.existsSync(fp)) fs.unlinkSync(fp);
     }
-
     if (expired.length > 0) {
       await db.delete(uploadsTable).where(lt(uploadsTable.expiresAt, now));
       logger.info({ count: expired.length }, "Cleaned up expired uploads");
