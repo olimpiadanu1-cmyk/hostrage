@@ -124,7 +124,7 @@ export default function Home() {
 
   const copyLink = () => {
     if (!uploadResult) return;
-    navigator.clipboard.writeText(`[site]${uploadResult.url}[/site]`);
+    navigator.clipboard.writeText(`[site=${uploadResult.url}][/site]`);
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
   };
@@ -424,7 +424,7 @@ export default function Home() {
                       </div>
                       <div className="p-4 flex items-start gap-3">
                         <code className="flex-1 text-sm font-mono text-primary break-all leading-relaxed" data-testid="text-upload-link">
-                          <span className="text-muted-foreground/60">[site]</span>{uploadResult.url}<span className="text-muted-foreground/60">[/site]</span>
+                          <span className="text-muted-foreground/60">[site=</span>{uploadResult.url}<span className="text-muted-foreground/60">][/site]</span>
                         </code>
                         <button
                           onClick={copyLink}
