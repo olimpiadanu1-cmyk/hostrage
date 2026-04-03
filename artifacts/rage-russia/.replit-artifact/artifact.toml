@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "RAGE RUSSIA - Хостинг доказательств"
+version = "1.0.0"
+id = "artifacts/rage-russia"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21128
+
+[services.development]
+run = "pnpm --filter @workspace/rage-russia run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/rage-russia", "run", "build" ]
+publicDir = "artifacts/rage-russia/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21128"
+BASE_PATH = "/"

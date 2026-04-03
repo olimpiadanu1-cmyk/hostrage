@@ -5,15 +5,6 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-export interface HealthStatus {
-  status: string;
-}
-
-export interface UploadResponse {
-  token: string;
-  url: string;
-  expiresAt: string;
-}
 
 export interface UploadInfo {
   token: string;
@@ -23,11 +14,3 @@ export interface UploadInfo {
   expiresAt: string;
   url: string;
 }
-
-export interface ErrorResponse {
-  error: string;
-}
-
-export type UploadFileBody = {
-  file: Blob;
-};

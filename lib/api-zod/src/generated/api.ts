@@ -14,3 +14,36 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Upload a photo or video file (max 100MB). Returns a unique link.
+ * @summary Upload a file
+ */
+export const UploadFileBody = zod.object({
+  file: zod.instanceof(File),
+});
+
+/**
+ * Get info about an uploaded file by its token
+ * @summary Get upload info
+ */
+export const GetUploadParams = zod.object({
+  token: zod.coerce.string(),
+});
+
+export const GetUploadResponse = zod.object({
+  token: zod.string(),
+  originalName: zod.string(),
+  mimeType: zod.string(),
+  size: zod.number(),
+  expiresAt: zod.string(),
+  url: zod.string(),
+});
+
+/**
+ * Streams the uploaded file
+ * @summary Serve the uploaded file
+ */
+export const ServeUploadParams = zod.object({
+  token: zod.coerce.string(),
+});
