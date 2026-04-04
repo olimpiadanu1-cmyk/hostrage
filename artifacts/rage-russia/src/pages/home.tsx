@@ -184,13 +184,14 @@ export default function Home() {
             const resData = data as any;
             if (resData.batchToken && resData.caseUrl) {
               setCaseToken(resData.batchToken);
-              setCaseUrl(resData.caseUrl);
+              const frontendCaseUrl = `${window.location.origin}/case/${resData.batchToken}`;
+              setCaseUrl(frontendCaseUrl);
               
               // NEW: If we are in a popup, tell the opener!
               if (window.opener) {
                 window.opener.postMessage({ 
                   type: 'RAGE_EVIDENCE_SUCCESS', 
-                  url: `[site=${resData.caseUrl}]800[/site]` 
+                  url: `[site=${frontendCaseUrl}]800[/site]` 
                 }, "*");
               }
             }
