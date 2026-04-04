@@ -190,7 +190,7 @@ export default function Home() {
               if (window.opener) {
                 window.opener.postMessage({ 
                   type: 'RAGE_EVIDENCE_SUCCESS', 
-                  url: `[site=${resData.caseUrl}][/site]` 
+                  url: `[site=${resData.caseUrl}]800[/site]` 
                 }, "*");
               }
             }
@@ -216,7 +216,7 @@ export default function Home() {
   const copyLink = (index: number) => {
     const f = uploadedFiles[index];
     if (!f) return;
-    navigator.clipboard.writeText(`[site=${f.url}][/site]`);
+    navigator.clipboard.writeText(`[site=${f.url}]800[/site]`);
     setUploadedFiles((prev) =>
       prev.map((item, i) => (i === index ? { ...item, copied: true } : item))
     );
@@ -509,12 +509,12 @@ export default function Home() {
                    <div className="p-4 flex items-center gap-4">
                       <div className="flex-1 min-w-0">
                          <code className="text-sm font-mono text-primary break-all block leading-tight">
-                            <span className="text-muted-foreground/40">[site=</span>{caseUrl}<span className="text-muted-foreground/40">][/site]</span>
+                            <span className="text-muted-foreground/40">[site=</span>{caseUrl}<span className="text-muted-foreground/40">]800[/site]</span>
                          </code>
                       </div>
                       <Button 
                         onClick={() => {
-                          navigator.clipboard.writeText(`[site=${caseUrl}][/site]`);
+                          navigator.clipboard.writeText(`[site=${caseUrl}]800[/site]`);
                           toast({ title: "Скопировано", description: "Общая ссылка готова для форума" });
                         }}
                         className="flex-shrink-0 h-10 px-6 font-bold uppercase tracking-widest text-xs"
@@ -587,7 +587,7 @@ export default function Home() {
                         </div>
                         <div className="p-3 flex items-start gap-2">
                           <code className="flex-1 text-xs font-mono text-primary break-all leading-relaxed">
-                            <span className="text-muted-foreground/50">[site=</span>{f.url}<span className="text-muted-foreground/50">][/site]</span>
+                            <span className="text-muted-foreground/50">[site=</span>{f.url}<span className="text-muted-foreground/50">]800[/site]</span>
                           </code>
                           <button
                             onClick={() => copyLink(index)}
