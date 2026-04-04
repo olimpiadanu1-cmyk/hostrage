@@ -12,16 +12,14 @@ const router: IRouter = Router();
 
 const uploadRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 5,
+  max: 50, // Увеличили с 5 до 50
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => {
-    const forwarded = req.headers["x-forwarded-for"];
-    const ip = Array.isArray(forwarded) ? forwarded[0] : (forwarded ?? req.socket.remoteAddress ?? "unknown");
-    return ip.split(",")[0].trim();
+    return (req.headers["x-forwarded-for"] as string)?.split(",")[0] || req.socket.remoteAddress || "unknown";
   },
   handler: (_req, res) => {
-    res.status(429).json({ error: "Слишком много загрузок. Попробуйте снова через час." });
+    res.status(429).json({ error: "Слишком много загрузок. Попробуйте снова позже." });
   },
 });
 
