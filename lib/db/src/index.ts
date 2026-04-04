@@ -1,5 +1,7 @@
-import { drizzle } from "drizzle-orm/pglite";
+import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
+import { drizzle as drizzlePg } from "drizzle-orm/node-postgres";
 import { PGlite } from "@electric-sql/pglite";
+import pg from "pg";
 import * as schema from "./schema";
 import path from "path";
 import fs from "fs";
@@ -13,17 +15,26 @@ function findRoot() {
     }
     curr = path.dirname(curr);
   }
-  return process.cwd(); // Fallback to current directory
+  return process.cwd();
 }
 
-const root = findRoot();
-const dataPath = path.resolve(root, ".data/postgres");
+const dbUrl = process.env.DATABASE_URL;
 
-// This log will help us confirm the path resolution during start
-console.log(`[PGlite] Database root: ${root}`);
-console.log(`[PGlite] Data path: ${dataPath}`);
+function createDb() {
+  if (dbUrl) {
+    // Production / Neon.tech
+    console.log(`[Database] Connecting to PostgreSQL (Neon)...`);
+    const pool = new pg.Pool({ connectionString: dbUrl });
+    return drizzlePg(pool, { schema });
+  } else {
+    // Local / PGlite
+    const root = findRoot();
+    const dataPath = path.resolve(root, ".data/postgres");
+    console.log(`[Database] Using PGlite info: ${dataPath}`);
+    const client = new PGlite(dataPath);
+    return drizzlePglite(client, { schema });
+  }
+}
 
-export const client = new PGlite(dataPath);
-export const db = drizzle(client, { schema });
-
+export const db = createDb();
 export * from "./schema";
