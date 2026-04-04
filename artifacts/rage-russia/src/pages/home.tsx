@@ -493,7 +493,7 @@ export default function Home() {
               <div className="flex items-start gap-3 p-4 bg-secondary/60 border border-border rounded-lg">
                 <ShieldAlert className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm leading-relaxed">
-                  Вставьте {caseUrl ? "ссылку на кейс" : "каждую ссылку"} в раздел <span className="text-primary font-bold">"Доказательства"</span> вашей жалобы.
+                  Обязательно копируйте и вставляйте <span className="text-primary font-bold">всю строку целиком</span> (вместе с частями <code className="text-xs bg-background px-1 py-0.5 rounded text-primary text-muted-foreground/80">[site]...[/site]</code>) в раздел "Доказательства" вашей жалобы на форуме.
                 </p>
               </div>
 
