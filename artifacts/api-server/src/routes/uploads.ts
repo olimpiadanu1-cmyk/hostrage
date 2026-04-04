@@ -170,11 +170,13 @@ router.post("/uploads/batch", uploadRateLimit, (req, res, next) => {
       }
 
       const base = getBaseUrl(req as never);
+      const frontendBase = req.get("origin") || (req.get("referer") ? new URL(req.get("referer")).origin : base);
+      
       const batchToken = generateToken();
       const uploads = await Promise.all(files.map((f) => saveUpload(f, base, batchToken)));
 
       req.log.info({ count: files.length, batchToken }, "Batch uploaded");
-      res.status(201).json({ uploads, batchToken, caseUrl: `${base}/case/${batchToken}` });
+      res.status(201).json({ uploads, batchToken, caseUrl: `${frontendBase}/case/${batchToken}` });
     } catch (error) {
       next(error);
     }
