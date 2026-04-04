@@ -92,11 +92,6 @@ export default function Case() {
       <div className="relative w-full max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex flex-col items-center mb-10 text-center">
-          <div className="inline-flex items-center gap-2 mb-4">
-            <div className="w-8 h-0.5 bg-primary" />
-            <span className="text-primary text-xs font-bold uppercase tracking-[0.3em]">Evidence Case</span>
-            <div className="w-8 h-0.5 bg-primary" />
-          </div>
           <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-glow mb-4" style={{ color: "hsl(var(--primary))" }}>
             Материалы дела
           </h1>
@@ -172,7 +167,6 @@ export default function Case() {
 
         {/* Footer */}
         <div className="mt-16 text-center">
-            <p className="text-muted-foreground text-[10px] font-bold uppercase tracking-[0.4em] mb-4">RAGE RUSSIA EVIDENCE HUB</p>
             <Button asChild variant="ghost" className="text-muted-foreground hover:text-primary transition-colors">
               <a href="/" className="flex items-center gap-2">
                 <ArrowLeft className="w-4 h-4" />
