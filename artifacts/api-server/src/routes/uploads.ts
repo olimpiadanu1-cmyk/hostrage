@@ -88,13 +88,13 @@ function generateToken(): string {
   return randomBytes(24).toString("base64url");
 }
 
-function getBaseUrl(req: Parameters<typeof router.get>[1] extends (req: infer R, ...args: unknown[]) => unknown ? R : never): string {
+function getBaseUrl(req: any): string {
   const host = req.get("host") ?? "localhost";
-  const protocol = req.get("x-forwarded-proto") ?? req.protocol ?? "https";
+  const protocol = req.get("x-forwarded-proto") ?? req.protocol ?? "http";
   return `${protocol}://${host}`;
 }
 
-async function saveUpload(file: Express.Multer.File, base: string) {
+async function saveUpload(file: Express.Multer.File, base: string, batchToken?: string) {
   const token = generateToken();
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
@@ -105,6 +105,7 @@ async function saveUpload(file: Express.Multer.File, base: string) {
     size: file.size,
     filePath: file.filename,
     expiresAt,
+    batchToken,
   });
 
   return {
@@ -171,10 +172,11 @@ router.post("/uploads/batch", uploadRateLimit, (req, res, next) => {
       }
 
       const base = getBaseUrl(req as never);
-      const uploads = await Promise.all(files.map((f) => saveUpload(f, base)));
+      const batchToken = generateToken();
+      const uploads = await Promise.all(files.map((f) => saveUpload(f, base, batchToken)));
 
-      req.log.info({ count: files.length }, "Batch uploaded");
-      res.status(201).json({ uploads });
+      req.log.info({ count: files.length, batchToken }, "Batch uploaded");
+      res.status(201).json({ uploads, batchToken, caseUrl: `${base}/case/${batchToken}` });
     } catch (error) {
       next(error);
     }
@@ -235,6 +237,37 @@ router.get("/uploads/:token/file", async (req, res): Promise<void> => {
   res.setHeader("Content-Type", row.mimeType);
   res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(row.originalName)}"`);
   res.sendFile(filePath);
+});
+
+router.get("/cases/:token", async (req, res): Promise<void> => {
+  const rawToken = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
+  const rows = await db.select().from(uploadsTable).where(eq(uploadsTable.batchToken, rawToken));
+
+  if (rows.length === 0) {
+    res.status(404).json({ error: "Case not found or expired" });
+    return;
+  }
+
+  // Filter out any expired files (just in case they weren't cleaned up)
+  const now = new Date();
+  const validRows = rows.filter(r => r.expiresAt > now);
+
+  if (validRows.length === 0) {
+    res.status(404).json({ error: "Case not found or expired" });
+    return;
+  }
+
+  const base = getBaseUrl(req as never);
+  const uploads = validRows.map(r => ({
+    token: r.token,
+    originalName: r.originalName,
+    mimeType: r.mimeType,
+    size: r.size,
+    url: `${base}/api/uploads/${r.token}/file`,
+    expiresAt: r.expiresAt.toISOString(),
+  }));
+
+  res.json({ uploads });
 });
 
 export async function cleanupExpiredUploads(): Promise<void> {

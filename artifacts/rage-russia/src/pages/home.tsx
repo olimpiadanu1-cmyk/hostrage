@@ -3,11 +3,18 @@ import { useBatchUploadFiles } from "@workspace/api-client-react";
 import {
   Upload, X, AlertTriangle, CheckCircle2, Copy, FileVideo,
   FileImage, ArrowLeft, Clock, ShieldAlert, ChevronRight,
-  Play, Plus, Check
+  Play, Plus, Check, HelpCircle, Maximize2
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Requirements } from "@/components/requirements";
 import { useToast } from "@/hooks/use-toast";
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
@@ -61,6 +68,8 @@ export default function Home() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [appState, setAppState] = useState<AppState>("upload");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [caseToken, setCaseToken] = useState<string | null>(null);
+  const [caseUrl, setCaseUrl] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
 
   const { toast } = useToast();
@@ -172,6 +181,19 @@ export default function Home() {
               copied: false,
             }));
             setUploadedFiles(uploaded);
+            const resData = data as any;
+            if (resData.batchToken && resData.caseUrl) {
+              setCaseToken(resData.batchToken);
+              setCaseUrl(resData.caseUrl);
+              
+              // NEW: If we are in a popup, tell the opener!
+              if (window.opener) {
+                window.opener.postMessage({ 
+                  type: 'RAGE_EVIDENCE_SUCCESS', 
+                  url: `[site=${resData.caseUrl}][/site]` 
+                }, "*");
+              }
+            }
             setAppState("success");
             setSelectedFiles([]);
             setUploadProgress(0);
@@ -210,6 +232,8 @@ export default function Home() {
     selectedFiles.forEach((f) => URL.revokeObjectURL(f.previewUrl));
     setSelectedFiles([]);
     setUploadedFiles([]);
+    setCaseToken(null);
+    setCaseUrl(null);
     setAppState("upload");
     setUploadProgress(0);
     setErrors([]);
@@ -226,18 +250,62 @@ export default function Home() {
         <div className="w-full max-w-2xl">
 
           {/* Header */}
-          <div className="text-center mb-10">
-            <div className="inline-flex items-center gap-3 mb-3">
-              <div className="w-8 h-0.5 bg-primary" />
-              <span className="text-primary text-xs font-bold uppercase tracking-[0.3em]">Evidence Portal</span>
-              <div className="w-8 h-0.5 bg-primary" />
-            </div>
+          <div className="text-center mb-10 relative">
             <h1 className="text-5xl md:text-6xl font-black uppercase tracking-tighter text-glow" style={{ color: "hsl(var(--primary))" }}>
               RAGE RUSSIA
             </h1>
-            <p className="mt-2 text-muted-foreground text-sm tracking-widest uppercase font-medium">
-              Хостинг доказательств для жалоб
-            </p>
+            <div className="mt-2 flex items-center justify-center gap-2">
+              <p className="text-muted-foreground text-sm tracking-widest uppercase font-medium">
+                Хостинг доказательств для жалоб
+              </p>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <button className="p-1 rounded-md bg-secondary/30 border border-border hover:border-primary/50 text-muted-foreground hover:text-primary transition-all duration-300 group">
+                    <HelpCircle className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                  </button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px] border-primary/20">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl font-black uppercase tracking-tight text-primary">Инструкция</DialogTitle>
+                    <DialogDescription className="text-muted-foreground font-medium">
+                      Как пользоваться хостингом доказательств
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-6 py-4">
+                    <div className="flex gap-4">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-xs font-bold text-primary">1</div>
+                      <div>
+                        <h4 className="font-bold text-sm uppercase tracking-wide">Выбор файлов</h4>
+                        <p className="text-xs text-muted-foreground mt-1">Выберите до 5 фото и до 3 видео (макс. 100 МБ на файл).</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-4">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-xs font-bold text-primary">2</div>
+                      <div>
+                        <h4 className="font-bold text-sm uppercase tracking-wide">Загрузка</h4>
+                        <p className="text-xs text-muted-foreground mt-1">Нажмите кнопку «Загрузить». Файлы сохранятся в нашем облаке.</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-4">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-xs font-bold text-primary">3</div>
+                      <div>
+                        <h4 className="font-bold text-sm uppercase tracking-wide">Копирование</h4>
+                        <p className="text-xs text-muted-foreground mt-1">Нажмите «Копировать» под нужным файлом. Ссылка уже готова для форума (BB-код).</p>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-secondary/50 border border-border rounded-lg">
+                      <div className="flex items-center gap-2 text-xs font-bold text-primary uppercase tracking-widest mb-1">
+                        <Clock className="w-3 h-3" />
+                        Срок хранения
+                      </div>
+                      <p className="text-[10px] text-muted-foreground leading-relaxed">
+                        Все файлы автоматически удаляются через 7 дней после загрузки.
+                      </p>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
 
           {/* ── UPLOAD STATE ── */}
@@ -390,9 +458,6 @@ export default function Home() {
                 </button>
               )}
 
-              <div className="mt-2">
-                <Requirements />
-              </div>
             </div>
           )}
 
@@ -427,11 +492,48 @@ export default function Home() {
               <div className="flex items-start gap-3 p-4 bg-secondary/60 border border-border rounded-lg">
                 <ShieldAlert className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
                 <p className="text-sm leading-relaxed">
-                  Вставьте каждую ссылку в раздел <span className="text-primary font-bold">"Доказательства"</span> вашей жалобы. Используйте ссылки в том виде, в котором они показаны ниже.
+                  Вставьте {caseUrl ? "ссылку на кейс" : "каждую ссылку"} в раздел <span className="text-primary font-bold">"Доказательства"</span> вашей жалобы.
                 </p>
               </div>
 
-              {/* File cards — scrollable */}
+              {/* Case Link (Single link for the whole batch) */}
+              {caseUrl && (
+                <div className="bg-card border-2 border-primary/40 rounded-xl overflow-hidden glow-red-sm animate-in zoom-in-95 duration-500">
+                   <div className="px-4 py-2 bg-primary/20 border-b border-primary/20 flex items-center justify-between">
+                      <span className="text-xs font-black uppercase tracking-[0.2em] text-primary">Общая ссылка на улики</span>
+                      <div className="flex items-center gap-1.5 text-[10px] text-primary/70 font-bold uppercase">
+                        <Maximize2 className="w-3 h-3" />
+                        Галерея активна
+                      </div>
+                   </div>
+                   <div className="p-4 flex items-center gap-4">
+                      <div className="flex-1 min-w-0">
+                         <code className="text-sm font-mono text-primary break-all block leading-tight">
+                            <span className="text-muted-foreground/40">[site=</span>{caseUrl}<span className="text-muted-foreground/40">][/site]</span>
+                         </code>
+                      </div>
+                      <Button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(`[site=${caseUrl}][/site]`);
+                          toast({ title: "Скопировано", description: "Общая ссылка готова для форума" });
+                        }}
+                        className="flex-shrink-0 h-10 px-6 font-bold uppercase tracking-widest text-xs"
+                      >
+                         <Copy className="w-4 h-4 mr-2" />
+                         Копировать всё
+                      </Button>
+                   </div>
+                </div>
+              )}
+
+              {/* Divider if showing case + individual (optional, we usually want either or) */}
+              {caseUrl && <div className="py-2 flex items-center gap-4">
+                 <div className="h-px flex-1 bg-border/20" />
+                 <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Состав кейса</span>
+                 <div className="h-px flex-1 bg-border/20" />
+              </div>}
+
+              {/* File cards */}
               <div className="space-y-4">
                 {uploadedFiles.map((f, index) => (
                   <div key={f.token} className="bg-card border border-border rounded-xl overflow-hidden">
@@ -517,7 +619,6 @@ export default function Home() {
                 Загрузить новые доказательства
               </Button>
 
-              <Requirements />
             </div>
           )}
 

@@ -100,6 +100,8 @@ async function buildAll() {
       "puppeteer",
       "puppeteer-core",
       "electron",
+      "@electric-sql/pglite",
+      "drizzle-orm"
     ],
     sourcemap: "linked",
     plugins: [

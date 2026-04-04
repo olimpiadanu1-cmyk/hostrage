@@ -11,6 +11,7 @@ export const uploadsTable = pgTable("uploads", {
   filePath: text("file_path").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  batchToken: text("batch_token"),
 });
 
 export const insertUploadSchema = createInsertSchema(uploadsTable).omit({ id: true, createdAt: true });
