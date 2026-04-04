@@ -37,7 +37,8 @@ export default function Case() {
     const fetchCase = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`/api/cases/${token}`);
+        const apiUrl = import.meta.env.VITE_API_URL || "";
+        const res = await fetch(`${apiUrl}/api/cases/${token}`);
         if (!res.ok) {
           throw new Error("Улики не найдены или срок хранения истёк");
         }
