@@ -222,7 +222,8 @@ export default function Home() {
         try {
           data = JSON.parse(xhr.responseText);
         } catch (e) {
-          toast({ variant: "destructive", title: "Ошибка", description: "Некорректный ответ сервера" });
+          let snip = xhr.responseText.slice(0, 50);
+          toast({ variant: "destructive", title: `Ошибка ${xhr.status}`, description: `Не удалось разобрать ответ: ${snip}` });
           setIsUploading(false);
           return;
         }
