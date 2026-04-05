@@ -493,9 +493,14 @@ export default function Home() {
                       </div>
                     </div>
                     <Progress value={uploadProgress} className="h-2" />
-                    <div className="flex justify-between items-center text-[10px] text-muted-foreground mt-2 opacity-80">
-                      <span>Скорость зависит от вашего интернета</span>
-                      {uploadEta && <span>Осталось: {uploadEta}</span>}
+                    <div className="flex flex-col gap-1.5 mt-2">
+                      <div className="flex justify-between items-center text-[10px] text-muted-foreground opacity-80">
+                        <span>Скорость зависит от вашего интернета</span>
+                        {uploadEta && <span>Осталось: {uploadEta}</span>}
+                      </div>
+                      <span className="text-[10px] text-primary/90 font-semibold text-center mt-1">
+                        Для максимальной скорости рекомендуем отключить VPN
+                      </span>
                     </div>
                   </div>
                 ) : (
