@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+﻿import { useState, useRef, useCallback, useEffect } from "react";
 import { useBatchUploadFiles } from "@workspace/api-client-react";
 import {
   Upload, X, AlertTriangle, CheckCircle2, Copy, FileVideo,
@@ -570,7 +570,7 @@ export default function Home() {
               {caseUrl && (
                 <div className="bg-card border-2 border-primary/40 rounded-xl overflow-hidden glow-red-sm animate-in zoom-in-95 duration-500">
                    <div className="px-4 py-2 bg-primary/20 border-b border-primary/20 flex items-center justify-between">
-                      <span className="text-xs font-black uppercase tracking-[0.2em] text-primary">Общая ссылка на улики</span>
+                      <span className="text-xs font-black uppercase tracking-[0.2em] text-primary">Общая ссылка на доказательства</span>
                       <div className="flex items-center gap-1.5 text-[10px] text-primary/70 font-bold uppercase">
                         <Maximize2 className="w-3 h-3" />
                         Галерея активна
@@ -599,7 +599,7 @@ export default function Home() {
               {/* Divider if showing case + individual (optional, we usually want either or) */}
               {caseUrl && <div className="py-2 flex items-center gap-4">
                  <div className="h-px flex-1 bg-border/20" />
-                 <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Состав кейса</span>
+                 <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">Состав доказательств</span>
                  <div className="h-px flex-1 bg-border/20" />
               </div>}
 
