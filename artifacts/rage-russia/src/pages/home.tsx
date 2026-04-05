@@ -44,6 +44,23 @@ function formatSize(bytes: number) {
   return `${mb.toFixed(2)} MB`;
 }
 
+function formatSpeed(bytesPerSec: number) {
+  if (!isFinite(bytesPerSec) || bytesPerSec === 0) return "0 Б/с";
+  const k = 1024;
+  const sizes = ["Б/с", "КБ/с", "МБ/с"];
+  const i = Math.floor(Math.log(bytesPerSec) / Math.log(k));
+  if (i >= sizes.length) return "Очень быстро";
+  return parseFloat((bytesPerSec / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+}
+
+function formatEta(seconds: number) {
+  if (!isFinite(seconds) || seconds < 0) return "Оценка...";
+  if (seconds < 60) return `${Math.ceil(seconds)} сек`;
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.ceil(seconds % 60);
+  return `${mins} мин ${secs} сек`;
+}
+
 interface SelectedFile {
   file: File;
   previewUrl: string;
@@ -71,6 +88,10 @@ export default function Home() {
   const [caseToken, setCaseToken] = useState<string | null>(null);
   const [caseUrl, setCaseUrl] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadSpeed, setUploadSpeed] = useState<string | null>(null);
+  const [uploadEta, setUploadEta] = useState<string | null>(null);
 
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -153,65 +174,100 @@ export default function Home() {
 
   const handleUpload = () => {
     if (selectedFiles.length === 0) return;
+    setIsUploading(true);
     setUploadProgress(0);
+    setUploadSpeed(null);
+    setUploadEta(null);
 
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 85) { clearInterval(interval); return 85; }
-        return prev + Math.random() * 8;
-      });
-    }, 300);
-
+    const formData = new FormData();
+    selectedFiles.forEach((sf) => formData.append("files", sf.file));
     const previews = selectedFiles.map((sf) => ({ previewUrl: sf.previewUrl, mimeType: sf.file.type, name: sf.file.name }));
 
-    batchMutation.mutate(
-      { data: { files: selectedFiles.map((sf) => sf.file) } },
-      {
-        onSuccess: (data) => {
-          clearInterval(interval);
-          setUploadProgress(100);
-          setTimeout(() => {
-            const uploaded: UploadedFile[] = data.uploads.map((u, i) => ({
-              token: u.token,
-              url: u.url,
-              expiresAt: u.expiresAt,
-              originalName: previews[i]?.name ?? `Файл ${i + 1}`,
-              mimeType: previews[i]?.mimeType ?? "image/jpeg",
-              previewUrl: previews[i]?.previewUrl ?? "",
-              copied: false,
-            }));
-            setUploadedFiles(uploaded);
-            const resData = data as any;
-            if (resData.batchToken && resData.caseUrl) {
-              setCaseToken(resData.batchToken);
-              const frontendCaseUrl = `${window.location.origin}/case/${resData.batchToken}`;
-              setCaseUrl(frontendCaseUrl);
-              
-              // NEW: If we are in a popup, tell the opener!
-              if (window.opener) {
-                window.opener.postMessage({ 
-                  type: 'RAGE_EVIDENCE_SUCCESS', 
-                  url: `[site=${frontendCaseUrl}]800[/site]` 
-                }, "*");
-              }
-            }
-            setAppState("success");
-            setSelectedFiles([]);
-            setUploadProgress(0);
-          }, 600);
-        },
-        onError: (err: unknown) => {
-          clearInterval(interval);
-          setUploadProgress(0);
-          const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-          if (msg?.includes("Слишком много")) {
-            toast({ title: "Лимит загрузок", description: msg, variant: "destructive" });
-          } else {
-            toast({ title: "Ошибка загрузки", description: "Не удалось загрузить файлы. Попробуйте снова.", variant: "destructive" });
+    const xhr = new XMLHttpRequest();
+    const apiUrl = import.meta.env.VITE_API_URL || "";
+    xhr.open("POST", `${apiUrl}/api/uploads/batch`);
+
+    const startTime = Date.now();
+    let lastLoaded = 0;
+    let lastTime = startTime;
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percentComplete = Math.min((event.loaded / event.total) * 100, 99.9);
+        setUploadProgress(percentComplete);
+
+        const currentTime = Date.now();
+        const timeDiff = (currentTime - lastTime) / 1000;
+
+        if (timeDiff > 0.5) {
+          const bytesLoadedDiff = event.loaded - lastLoaded;
+          const speedBps = bytesLoadedDiff / timeDiff;
+
+          if (speedBps > 0) {
+            setUploadSpeed(formatSpeed(speedBps));
+            const remainingBytes = event.total - event.loaded;
+            const etaSeconds = remainingBytes / speedBps;
+            setUploadEta(formatEta(etaSeconds));
           }
-        },
+
+          lastLoaded = event.loaded;
+          lastTime = currentTime;
+        }
       }
-    );
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        let data;
+        try {
+          data = JSON.parse(xhr.responseText);
+        } catch (e) {
+          toast({ variant: "destructive", title: "Ошибка", description: "Некорректный ответ сервера" });
+          setIsUploading(false);
+          return;
+        }
+
+        setUploadProgress(100);
+        setTimeout(() => {
+          const uploaded: UploadedFile[] = data.uploads.map((u: any, i: number) => ({
+            token: u.token,
+            url: u.url,
+            expiresAt: u.expiresAt,
+            originalName: previews[i]?.name ?? `Файл ${i + 1}`,
+            mimeType: previews[i]?.mimeType ?? "image/jpeg",
+            previewUrl: previews[i]?.previewUrl ?? "",
+            copied: false,
+          }));
+          setUploadedFiles(uploaded);
+          if (data.batchToken && data.caseUrl) {
+            setCaseToken(data.batchToken);
+            const frontendCaseUrl = `${window.location.origin}/case/${data.batchToken}`;
+            setCaseUrl(frontendCaseUrl);
+
+            if (window.opener) {
+              window.opener.postMessage({
+                type: 'RAGE_EVIDENCE_SUCCESS',
+                url: `[site=${frontendCaseUrl}]800[/site]`
+              }, "*");
+            }
+          }
+          setAppState("success");
+          setSelectedFiles([]);
+          setIsUploading(false);
+          setUploadProgress(0);
+        }, 600);
+      } else {
+        toast({ variant: "destructive", title: "Ошибка", description: "Не удалось загрузить файлы" });
+        setIsUploading(false);
+      }
+    };
+
+    xhr.onerror = () => {
+      toast({ variant: "destructive", title: "Ошибка сети", description: "Проверьте подключение к интернету" });
+      setIsUploading(false);
+    };
+
+    xhr.send(formData);
   };
 
   const copyLink = (index: number) => {
@@ -410,7 +466,7 @@ export default function Home() {
                           <p className="font-semibold text-sm truncate" title={sf.file.name}>{sf.file.name}</p>
                           <p className="text-xs text-muted-foreground">{formatSize(sf.file.size)}</p>
                         </div>
-                        {!batchMutation.isPending && (
+                        {!isUploading && (
                           <button
                             onClick={() => removeFile(sf.id)}
                             className="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
@@ -427,16 +483,20 @@ export default function Home() {
 
               {/* Upload button / progress */}
               {hasFiles && (
-                batchMutation.isPending ? (
+                isUploading ? (
                   <div className="space-y-2">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-primary animate-pulse">Загружается {selectedFiles.length} {selectedFiles.length === 1 ? "файл" : "файла"}...</span>
-                      <span className="text-muted-foreground">{Math.round(uploadProgress)}%</span>
+                    <div className="flex justify-between items-end text-xs font-bold mb-2">
+                      <span className="text-primary animate-pulse">Загружается {selectedFiles.length} {selectedFiles.length === 1 ? "файл" : selectedFiles.length < 5 ? "файла" : "файлов"}...</span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="text-muted-foreground">{Math.round(uploadProgress)}%</span>
+                        {uploadSpeed && <span className="text-[10px] text-primary font-mono glow-red-sm px-1 rounded">{uploadSpeed}</span>}
+                      </div>
                     </div>
                     <Progress value={uploadProgress} className="h-2" />
-                    <p className="text-[10px] text-muted-foreground mt-2 opacity-70 text-center">
-                      Скорость загрузки зависит от скорости вашего интернета...
-                    </p>
+                    <div className="flex justify-between items-center text-[10px] text-muted-foreground mt-2 opacity-80">
+                      <span>Скорость зависит от вашего интернета</span>
+                      {uploadEta && <span>Осталось: {uploadEta}</span>}
+                    </div>
                   </div>
                 ) : (
                   <Button
@@ -451,7 +511,7 @@ export default function Home() {
               )}
 
               {/* Add more button when already have files and can add more */}
-              {hasFiles && canAddMore && !batchMutation.isPending && (
+              {hasFiles && canAddMore && !isUploading && (
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-dashed border-border hover:border-primary/40 text-sm text-muted-foreground hover:text-foreground transition-colors"
