@@ -434,6 +434,9 @@ export default function Home() {
                       <span className="text-muted-foreground">{Math.round(uploadProgress)}%</span>
                     </div>
                     <Progress value={uploadProgress} className="h-2" />
+                    <p className="text-[10px] text-muted-foreground mt-2 opacity-70 text-center">
+                      Скорость загрузки зависит от скорости вашего интернета...
+                    </p>
                   </div>
                 ) : (
                   <Button
